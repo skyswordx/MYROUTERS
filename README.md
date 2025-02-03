@@ -93,10 +93,63 @@ apk add <custom_package> --allow-untrusted
 
 ## 配置 minieap 以便通过校园网锐捷认证
 
-参考
-- [BoringCat/minieap-openwrt: minieap的openwrt Makefile (github.com)](https://github.com/BoringCat/minieap-openwrt)
-- [BoringCat/luci-app-minieap (github.com)](https://github.com/BoringCat/luci-app-minieap)
+符合 SYSU 锐捷认证体质的配置思路来源于群友[Aether Chen](https://github.com/chenjunyu19)，在此感谢群友的经验，DHCP 改成无，然后重试次数和超时设为 0（无限）下面是这一思路的最简配置
+```shell
+# 调整好用户名、密码和网卡
+username =
+password =
+nic =                                                       
 
+module = rjv3
+fake-dns2 = 0.0.0.0
+fake-serial = 0
+
+# 关键点在于下面的配置
+stage-timeout = 0
+max-retries = 0
+
+# 核心保证不能让 minieap 退出，要让它响应用户名请求
+# 锐捷客户端大概 5 分钟没响应的话就会切断链路
+# minieap 是个状态机，认证成功以后服务器又持续询问用户名
+# 会让状态机跳回到认证过程状态，会触发状态超时，然后退出
+# 说白了就是 minieap 程序没适配，但是改改配置也能用
+# 可以当这个是心跳，锐捷这个是魔改 802.1x，比如这个 “心跳” 就比较奇葩
+
+# 正常运行以后应该每 30 或 60 秒就会显示一次回应用户名
+```
+
+配合 `luci-app-minieap` 插件在 web 端修改参数，通过 `uci` 文件，软链接到位于 `/etc/minieap.conf` 的配置文件的效果如下
+```shell
+# root@LibWrt:/etc: cat minieap.conf
+auth-round=1
+daemonize=3
+dhcp-type=3
+eap-bcast-addr=0
+heartbeat=60
+if-impl=sockraw
+max-dhcp-count=3
+max-fail=3
+module = rjv3
+
+#### 核心 ####
+max-retries=3
+#############
+
+nic=eth0
+no-auto-reauth=1
+password=
+pid-file=/var/run/minieap.pid
+pingcommand=minieap -k 1
+service=internet
+
+##### 核心 #####
+stage-timeout=5
+###############
+
+username=
+version-str=RG-SU For Linux V1.0
+wait-after-fail=30
+```
 ## 参考链接
 
 `qualcommax/ipq60xx` 目标平台的官方软件源及其镜像站
@@ -133,3 +186,8 @@ OpenWRT 相关的官方页面
 	- [Openwrt 交叉编译(Crosscompile)及使用SDK生成ipk安装包 – YJ's Blog (yjblog.net)](https://www.yjblog.net/post/123.html)
 	- [超详细！手把手演示编译OpenWrt内核驱动模块_openwrt编译内核-CSDN博客](https://blog.csdn.net/qq_41453285/article/details/102760270)
 	- [muink/luci-app-tinyfilemanager: LuCI Tiny File Manager: Web based File Manager in PHP (github.com)](https://github.com/muink/luci-app-tinyfilemanager)
+
+配置 minieap 的部分参考
+- https://github.com/updateing/minieap/blob/master/README.md
+- [BoringCat/minieap-openwrt: minieap的openwrt Makefile (github.com)](https://github.com/BoringCat/minieap-openwrt)
+- [BoringCat/luci-app-minieap (github.com)](https://github.com/BoringCat/luci-app-minieap)
