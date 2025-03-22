@@ -13,6 +13,7 @@
 
 之后将这个压 SDK 源码缩包转移到 WSL 环境下进行解压
 ```shell
+sudo apt install zstd
 tar -I zstd -xvf <openwrt-SDK.tar.zst> # 解压对应的 SDK 源码即可
 
 cd openWrt-SDK && make menuconfig # 切换到 SDK 根目录
@@ -50,22 +51,33 @@ cd openWrt-SDK && make menuconfig # 切换到 SDK 根目录
 
 所以在使用 `feeds` 的 `update` 和 `install` 官方 `feeds` 软件源之后，为了省事可以自己在 ` SDK/package/ ` 下面新建一个插件文件夹，然后 clone 插件的 git 源码仓库之后手动搞一个 ` makefile ` 进行配置
 
-在有了对应的 `makefile` 文件之后，就可以回到 SDK 的根目录，进行下面的操作
+然后是在编译前配备所需要的依赖库
+```shell
+sudo apt-get install gcc g++ build-essential asciidoc  binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch flex bison make autoconf texinfo unzip sharutils subversion ncurses-term zlib1g-dev ccache upx lib32gcc1 libc6-dev-i386 uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev libglib2.0-dev xmlto qemu-utils automake libtool  -y
+```
+
+使用 `make menuconfig` 进行编译配置的检查，有些时候在这个页面没有显示新加的软件包或者模组，可能是由于第一次加载他们出现依赖问题没有成功，然后虽然再添加了依赖，但是还没显示是正常的，有可能是当前终端的缓存问题，试试重开一个终端进行 `make menuconfig`
+
+在确认系统识别到了对应的 `makefile` 文件之后，就可以回到 SDK 的根目录，进行下面的操作
 ```shell
 # 多线程编译
 make defconfig
 
 # 根据对应软件包的 makefile 编译
-make package/path/to/pack_or_mod/compile -j$(grep processor /proc/cpuinfo | wc -l)
+make package/path/to/pack_or_mod/compile  V=s -j$(grep processor /proc/cpuinfo | wc -l)
+
+# 用 V=s 来生成编译过程的详细信息，方便查找出错原因
 ```
 
 ## 为编译插件编写 makefile 以及完整的编译流程
+
 
 
 ## 传送文件给路由器
 
 1. 推荐使用 `ssh`
 	1. scp + [WinSCP: Free SFTP and FTP client for Windows](https://winscp.net/eng/index.php)
+		1. 注意，主机名指的是 `192.168.11.11`
 2. 使用 U 盘，进行挂载（~~当然也可以分区，不过无关~~）
 	1. NTFS 需要 `ntfs-3g` 这个软件包，并且依赖 `kmod-fuse` 模块
 		- [OpenWrt Wiki package: kmod-fuse](https://openwrt.org/packages/pkgdata/kmod-fuse)
